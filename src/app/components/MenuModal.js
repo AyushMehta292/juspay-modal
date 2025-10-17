@@ -1,7 +1,7 @@
 "use client";
 
 import { motion, AnimatePresence } from "framer-motion";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { menuData } from "../data/menuData";
 import {
   BookOpen,
@@ -90,36 +90,6 @@ export default function MenuModal({ isOpen, onClose }) {
     }
   }, [currentIndex, isOpen]);
 
-  // Add global mouse event listeners for drag functionality
-  useEffect(() => {
-    if (isDragging) {
-      document.addEventListener('mousemove', handleMouseMove);
-      document.addEventListener('mouseup', handleMouseUp);
-
-      return () => {
-        document.removeEventListener('mousemove', handleMouseMove);
-        document.removeEventListener('mouseup', handleMouseUp);
-      };
-    }
-  }, [isDragging]);
-
-  const handleItemClick = (item) => {
-    if (item.children && item.children.length > 0) {
-      setPreviousIndex(currentIndex);
-      setIsInitialLoad(false); // Enable animations after first navigation
-      setNavigationHistory(prev => [...prev.slice(0, currentIndex + 1), item]);
-      setCurrentIndex(prev => prev + 1);
-    }
-  };
-
-  const handleBackClick = () => {
-    if (currentIndex > 0) {
-      setPreviousIndex(currentIndex);
-      setIsInitialLoad(false); // Enable animations after first navigation
-      setCurrentIndex(prev => prev - 1);
-    }
-  };
-
   // Drag to dismiss functionality
   const handleDragStart = (clientY) => {
     setIsDragging(true);
@@ -171,15 +141,47 @@ export default function MenuModal({ isOpen, onClose }) {
     }
   };
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (isDragging) {
       handleDragMove(e.clientY);
     }
+  }, [isDragging, handleDragMove]);
+
+  const handleMouseUp = useCallback(() => {
+    handleDragEnd();
+  }, [handleDragEnd]);
+
+  // Add global mouse event listeners for drag functionality
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+
+      return () => {
+        document.removeEventListener('mousemove', handleMouseMove);
+        document.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, handleMouseMove, handleMouseUp]);
+
+  const handleItemClick = (item) => {
+    if (item.children && item.children.length > 0) {
+      setPreviousIndex(currentIndex);
+      setIsInitialLoad(false); // Enable animations after first navigation
+      setNavigationHistory(prev => [...prev.slice(0, currentIndex + 1), item]);
+      setCurrentIndex(prev => prev + 1);
+    }
   };
 
-  const handleMouseUp = () => {
-    handleDragEnd();
+  const handleBackClick = () => {
+    if (currentIndex > 0) {
+      setPreviousIndex(currentIndex);
+      setIsInitialLoad(false); // Enable animations after first navigation
+      setCurrentIndex(prev => prev - 1);
+    }
   };
+
+
 
   const canGoBack = currentIndex > 0;
   const hasChildren = currentData.children && currentData.children.length > 0;

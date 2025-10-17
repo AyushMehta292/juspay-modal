@@ -16,7 +16,7 @@ export default function Home() {
       <div className="bg-white shadow-sm border-b border-gray-200 py-4 px-4">
         <div className="max-w-md mx-auto text-center">
           <h1 className="text-2xl sm:text-3xl text-gray-900">
-            Ayush Mehta's Submission
+            Ayush Mehta&apos;s Submission
           </h1>
         </div>
       </div>
