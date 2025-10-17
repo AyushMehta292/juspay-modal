@@ -9,3 +9,19 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none; /* Safari and Chrome */
 }
+
+/* Prevent text selection during modal interactions */
+.modal-content,
+.modal-content * {
+  -webkit-user-select: none !important; /* Safari */
+  -moz-user-select: none !important; /* Firefox */
+  -ms-user-select: none !important; /* Internet Explorer/Edge */
+  user-select: none !important; /* Standard */
+  -webkit-touch-callout: none !important; /* Disable iOS callout */
+  -webkit-tap-highlight-color: transparent !important; /* Remove tap highlight */
+  -webkit-user-drag: none !important; /* Prevent image dragging */
+  -khtml-user-drag: none !important; /* Konqueror */
+  -moz-user-drag: none !important; /* Firefox */
+  -o-user-drag: none !important; /* Opera */
+  user-drag: none !important; /* Standard */
+}

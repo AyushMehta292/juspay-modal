@@ -41,6 +41,7 @@ export default function MenuModal({ isOpen, onClose }) {
   const [isDragging, setIsDragging] = useState(false);
   const [dragY, setDragY] = useState(0);
   const [showScrollbar, setShowScrollbar] = useState(false);
+  const [isClosing, setIsClosing] = useState(false);
 
   const currentData = navigationHistory[currentIndex];
   const modalRef = useRef(null);
@@ -93,6 +94,16 @@ export default function MenuModal({ isOpen, onClose }) {
     };
   }, [currentIndex]);
 
+  // Prevent text selection during drag using CSS only
+  useEffect(() => {
+    if (isDragging) {
+      // CSS handles text selection prevention, just clear any existing selection
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+    }
+  }, [isDragging]);
+
   // Smooth drag to dismiss functionality
   const handleDragStart = (clientY) => {
     setIsDragging(true);
@@ -105,7 +116,9 @@ export default function MenuModal({ isOpen, onClose }) {
 
     const deltaY = clientY - dragOffset;
     if (deltaY > 0) { // Only allow downward dragging
-      setDragY(deltaY);
+      // Make drag more responsive by reducing friction
+      const smoothDeltaY = deltaY * 0.8; // Reduce sensitivity for smoother feel
+      setDragY(Math.min(smoothDeltaY, 300)); // Limit max drag distance
     }
   };
 
@@ -114,12 +127,14 @@ export default function MenuModal({ isOpen, onClose }) {
 
     setIsDragging(false);
 
-    if (dragY > 100) { // Close modal if dragged more than 100px
-      setDragY(window.innerHeight); // Animate off screen
+    if (dragY > 200) { // Close modal if dragged more than 200px
+      setIsClosing(true);
+      // Don't change dragY here - let the animate prop handle the continuation
       setTimeout(() => {
         onClose();
         setDragY(0);
-      }, 200);
+        setIsClosing(false);
+      }, 300);
     } else { // Reset position if not dragged far enough
       setDragY(0);
     }
@@ -130,12 +145,17 @@ export default function MenuModal({ isOpen, onClose }) {
   // Touch and mouse event handlers
   const handleTouchStart = (e) => {
     if (e.target.closest('.modal-content')) {
+      // Prevent text selection at the start of drag
+      if (window.getSelection) {
+        window.getSelection().removeAllRanges();
+      }
+
       handleDragStart(e.touches[0].clientY);
     }
   };
 
   const handleTouchMove = (e) => {
-    e.preventDefault();
+    // Only handle drag movement, let CSS handle text selection prevention
     if (isDragging) {
       handleDragMove(e.touches[0].clientY);
     }
@@ -199,17 +219,24 @@ export default function MenuModal({ isOpen, onClose }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.3, ease: "linear" }}
-      className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4 select-none"
+      style={{
+        touchAction: 'none', /* Prevent all touch actions on overlay */
+        WebkitUserSelect: 'none', /* Safari */
+        MozUserSelect: 'none', /* Firefox */
+        msUserSelect: 'none', /* Internet Explorer/Edge */
+        userSelect: 'none', /* Standard */
+      }}
       onClick={onClose}
     >
       <motion.div
-        initial={{ y: "100%", opacity: 0, scale: 0.95 }}
+        initial={{ y: 200, opacity: 0, scale: 0.95 }}
         animate={{
-          y: isDragging ? dragY : 0,
-          opacity: dragY > 100 ? 0 : 1,
-          scale: dragY > 100 ? 0.95 : 1
+          y: isDragging ? dragY : (isClosing ? dragY + 200 : 0),
+          opacity: isClosing ? 0 : 1,
+          scale: isClosing ? 0.95 : 1
         }}
-        exit={{ y: "100%", opacity: 0, scale: 0.95 }}
+        exit={{ y: 200, opacity: 0, scale: 0.95 }}
         transition={{
           duration: 0.3,
           ease: "linear",
@@ -219,6 +246,7 @@ export default function MenuModal({ isOpen, onClose }) {
         className="bg-white rounded-2xl w-full max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl mt-auto modal-content"
         style={{
           transform: isDragging ? `translateY(${dragY}px)` : 'translateY(0px)',
+          touchAction: 'pan-y', /* Allow vertical dragging but prevent pull-to-refresh */
         }}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
