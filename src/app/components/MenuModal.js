@@ -37,14 +37,12 @@ import {
 export default function MenuModal({ isOpen, onClose }) {
   const [navigationHistory, setNavigationHistory] = useState([menuData]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [previousIndex, setPreviousIndex] = useState(0);
-  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [dragOffset, setDragOffset] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
-  const [modalHeight, setModalHeight] = useState(0);
+  const [dragY, setDragY] = useState(0);
+  const [showScrollbar, setShowScrollbar] = useState(false);
 
   const currentData = navigationHistory[currentIndex];
-  const direction = currentIndex > previousIndex ? 1 : -1;
   const modalRef = useRef(null);
 
   // Icon mapping function
@@ -83,37 +81,49 @@ export default function MenuModal({ isOpen, onClose }) {
     return IconComponent ? <IconComponent size={16} /> : null;
   };
 
-  // Measure modal height on mount and navigation changes
+  // Control scrollbar visibility to prevent flash during animations
   useEffect(() => {
-    if (modalRef.current) {
-      setModalHeight(modalRef.current.offsetHeight);
-    }
-  }, [currentIndex, isOpen]);
+    const timer = setTimeout(() => {
+      setShowScrollbar(true);
+    }, 300); // Show scrollbar after animation completes
 
-  // Drag to dismiss functionality
+    return () => {
+      clearTimeout(timer);
+      setShowScrollbar(false);
+    };
+  }, [currentIndex]);
+
+  // Smooth drag to dismiss functionality
   const handleDragStart = (clientY) => {
     setIsDragging(true);
     setDragOffset(clientY);
+    setDragY(0);
   };
 
   const handleDragMove = (clientY) => {
     if (!isDragging) return;
 
     const deltaY = clientY - dragOffset;
-    if (deltaY > 0) { // Only allow downward drag
-      const dragDistance = Math.min(deltaY, modalHeight * 0.8);
-      setDragOffset(clientY);
-
-      // Close modal if dragged more than 50% of modal height
-      if (dragDistance > modalHeight * 0.5) {
-        handleDragEnd();
-        onClose();
-      }
+    if (deltaY > 0) { // Only allow downward dragging
+      setDragY(deltaY);
     }
   };
 
   const handleDragEnd = () => {
+    if (!isDragging) return;
+
     setIsDragging(false);
+
+    if (dragY > 100) { // Close modal if dragged more than 100px
+      setDragY(window.innerHeight); // Animate off screen
+      setTimeout(() => {
+        onClose();
+        setDragY(0);
+      }, 200);
+    } else { // Reset position if not dragged far enough
+      setDragY(0);
+    }
+
     setDragOffset(0);
   };
 
@@ -166,8 +176,6 @@ export default function MenuModal({ isOpen, onClose }) {
 
   const handleItemClick = (item) => {
     if (item.children && item.children.length > 0) {
-      setPreviousIndex(currentIndex);
-      setIsInitialLoad(false); // Enable animations after first navigation
       setNavigationHistory(prev => [...prev.slice(0, currentIndex + 1), item]);
       setCurrentIndex(prev => prev + 1);
     }
@@ -175,8 +183,6 @@ export default function MenuModal({ isOpen, onClose }) {
 
   const handleBackClick = () => {
     if (currentIndex > 0) {
-      setPreviousIndex(currentIndex);
-      setIsInitialLoad(false); // Enable animations after first navigation
       setCurrentIndex(prev => prev - 1);
     }
   };
@@ -185,27 +191,35 @@ export default function MenuModal({ isOpen, onClose }) {
 
   const canGoBack = currentIndex > 0;
   const hasChildren = currentData.children && currentData.children.length > 0;
+  const direction = currentIndex > 0 ? 1 : -1; // Simplified direction calculation
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.2, ease: "linear" }}
+      transition={{ duration: 0.3, ease: "linear" }}
       className="fixed inset-0 bg-black/50 flex items-end justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
         initial={{ y: "100%", opacity: 0, scale: 0.95 }}
-        animate={{ y: 0, opacity: 1, scale: 1 }}
+        animate={{
+          y: isDragging ? dragY : 0,
+          opacity: dragY > 100 ? 0 : 1,
+          scale: dragY > 100 ? 0.95 : 1
+        }}
         exit={{ y: "100%", opacity: 0, scale: 0.95 }}
         transition={{
-          duration: 0.2,
+          duration: 0.3,
           ease: "linear",
-          opacity: { duration: 0.2 }
+          opacity: { duration: 0.3 }
         }}
         ref={modalRef}
         className="bg-white rounded-2xl w-full max-w-lg md:max-w-xl lg:max-w-2xl xl:max-w-3xl mx-auto shadow-2xl mt-auto modal-content"
+        style={{
+          transform: isDragging ? `translateY(${dragY}px)` : 'translateY(0px)',
+        }}
         onClick={(e) => e.stopPropagation()}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
@@ -214,9 +228,8 @@ export default function MenuModal({ isOpen, onClose }) {
       >
         <motion.div
           key={`modal-content-${currentIndex}`}
-          layout
           transition={{
-            duration: 0.2,
+            duration: 0.3,
             ease: "linear"
           }}
           className="p-4 sm:p-6"
@@ -226,7 +239,6 @@ export default function MenuModal({ isOpen, onClose }) {
             <div className="flex items-center gap-3">
               {canGoBack && (
                 <motion.button
-                  layout
                   onClick={handleBackClick}
                   className="p-2 hover:bg-gray-100 rounded-2xl transition-colors"
                   transition={{ duration: 0.2, ease: "linear" }}
@@ -247,58 +259,41 @@ export default function MenuModal({ isOpen, onClose }) {
             </div>
           </div>
 
-          {/* Description */}
-          {/* <div className="mb-4">
-            <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-2xl">
-              {currentData.description}
-            </p>
-          </div> */}
 
           {/* Content */}
-          <AnimatePresence mode="wait" custom={isInitialLoad ? 0 : direction}>
+          <AnimatePresence mode="wait" custom={direction}>
             <motion.div
               key={currentIndex}
-              custom={isInitialLoad ? 0 : direction}
+              custom={direction}
               initial={(dir) => {
-                // No animation for initial load
-                if (isInitialLoad || dir === 0) {
-                  return { opacity: 1, x: 0 };
-                }
-                // Directional animation for navigation (contained within modal)
                 return {
                   opacity: 0,
-                  x: dir > 0 ? -30 : 30  // Forward: from left, Back: from right (within modal)
+                  x: dir > 0 ? -30 : 30
                 };
               }}
               animate={{ opacity: 1, x: 0 }}
               exit={(dir) => {
-                // No animation for initial load
-                if (isInitialLoad || dir === 0) {
-                  return { opacity: 1, x: 0 };
-                }
-                // Directional animation for navigation (contained within modal)
                 return {
                   opacity: 0,
-                  x: dir > 0 ? 30 : -30   // Forward: exit to right, Back: exit to left (within modal)
+                  x: dir > 0 ? 30 : -30
                 };
               }}
               transition={{
-                duration: isInitialLoad ? 0 : 0.2,
-                ease: "linear",
-                layout: { duration: 0.2, ease: "linear" }
+                duration: 0.3,
+                ease: "linear"
               }}
-              className="space-y-3 overflow-y-auto"
+              className={`space-y-3 ${showScrollbar ? 'overflow-y-auto scrollbar-hide' : 'overflow-hidden'}`}
             >
               {hasChildren ? (
                 currentData.children.map((item, index) => (
                   <motion.div
                     key={index}
-                    layout
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{
                       delay: index * 0.05,
-                      layout: { duration: 0.2, ease: "linear" }
+                      duration: 0.3,
+                      ease: "linear"
                     }}
                     className="p-4 rounded-2xl cursor-pointer transition-all hover:shadow-md hover:bg-gray-50"
                     onClick={() => handleItemClick(item)}
@@ -309,7 +304,7 @@ export default function MenuModal({ isOpen, onClose }) {
                           {getIcon(item.icon)}
                           <span className="flex-1">{item.title}</span>
                           {item.children && item.children.length > 0 && (
-                            <span className="text-xs bg-blue-100 text-blue-600 px-2 py-1 rounded-2xl">
+                            <span className="text-xs bg-gray-100 text-gray-900 px-2 py-1 rounded-2xl">
                               {item.children.length}
                             </span>
                           )}
@@ -319,7 +314,7 @@ export default function MenuModal({ isOpen, onClose }) {
                         </p>
                       </div>
                       {item.children && item.children.length > 0 && (
-                        <ChevronRight className="text-blue-500 ml-2" size={16} />
+                        <ChevronRight className="text-gray-500 ml-2" size={16} />
                       )}
                     </div>
                   </motion.div>

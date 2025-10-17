@@ -31,7 +31,7 @@ export default function Home() {
           >
             <motion.button
               onClick={openModal}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 sm:py-4 sm:px-8 rounded-2xl shadow-lg transition-colors duration-200 text-sm sm:text-base"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 sm:py-4 sm:px-8 rounded-full shadow-lg transition-colors duration-200 text-sm sm:text-base"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
             >
